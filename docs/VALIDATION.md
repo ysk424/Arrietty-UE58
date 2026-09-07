@@ -127,3 +127,37 @@ item below.
 Record further device results here with the date and implementation revision.
 Keep user-reported operation, automated verification and individual hardware
 measurements distinct.
+
+## Evening report: apparent invisible wall / VIVE occlusion
+
+During the 2026-09-07 evening session, the user reported an apparent transparent
+wall when flying south and places where the flight log seemed to stop.
+The CSV remained continuous (no sampling gaps over 0.5s), while position and
+altitude froze despite a nonzero displayed airspeed. Four pauses longer than
+0.5s occurred around 20:14-20:15 JST, lasting approximately 14.0, 7.0, 4.8 and
+5.9 seconds. The first was at east -883.734m, north -788.172m, altitude 10.656m,
+with displayed speed 21.108km/h. UE continued to report valid HMD tracking.
+
+These positions are inside the scenery coverage. The existing bridge requires
+valid handle-VIVE tracking as well as HMD alignment before advancing the flight
+model. A handle tracking loss therefore freezes motion and flight state while
+CSV sampling continues; it can feel like an invisible wall.
+
+The user identified the physical cause: only one of the four installed
+Lighthouses was visible to the handle-mounted VIVE, and the rider's body could
+occlude it. The user chose to arrange visibility to two Lighthouses. This
+records the user's diagnosis and planned placement change; the post-adjustment
+flight result has not yet been reported.
+
+The user also suspected reflections from the Surface Studio screen in front
+of the handle and proposed covering the screen with cloth. Covering reflective
+surfaces is consistent with [VIVE's Lighthouse guidance](https://blog.vive.com/us/roomscale-101/).
+Reflection suppression should be evaluated alongside unobstructed direct
+visibility to two base stations; a cover does not remove physical occlusion.
+The screen's contribution and the result of the cloth test remain unconfirmed.
+
+The proposed alternative of continuing flight with neutral steering during a
+VIVE tracking loss was not implemented. Keep the current tracking-loss stop
+behavior while evaluating the placement correction. No running session was
+restarted or changed during this diagnosis. The diagnostic logs were preserved
+locally under the ignored `logs/vive-occlusion-20260907-2014/` directory.
