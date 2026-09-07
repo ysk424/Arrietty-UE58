@@ -14,16 +14,31 @@ param(
     [string]$LocalDate = '',
     [string]$LocalTime = '17:45',
     [string]$WorldRoot = '',
+    [string]$WorldManifest = '',
+    [string]$RuntimeRoot = '',
+    [int]$WorldPort = 19859,
+    [int]$Port = 19858,
     [string]$EngineRoot = 'C:\Program Files\Epic Games\UE_5.8'
 )
 $ErrorActionPreference='Stop'
 $repo=$PSScriptRoot
+if ($WorldManifest) {
+    $worldArgs=@((Join-Path $repo 'tools\start_world.py'),'--world',$WorldManifest,'--port',"$WorldPort")
+    if ($RuntimeRoot) { $worldArgs+=@('--runtime',$RuntimeRoot) }
+    if ($Offline) { $worldArgs+='--offline' }
+    if ($SmokeTest) { $worldArgs+='--smoke' }
+    if ($Headless) { $worldArgs+='--headless' }
+    & py -3.13 @worldArgs
+    if ($LASTEXITCODE -ne 0) { throw 'Exported world launch failed.' }
+    return
+}
 if (-not $WorldRoot) { $WorldRoot=Join-Path (Split-Path -Parent $repo) 'Secret-World' }
 $project=Join-Path $repo 'unreal\ArriettyUE\ArriettyUE.uproject'
 $editor=Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
 if (($SmokeTest -or $Headless) -and -not $Offline) { throw 'SmokeTest/Headless requires -Offline.' }
 if (-not (Test-Path (Join-Path $repo 'unreal\ArriettyUE\Content\Maps\Funafuti.umap'))) { throw 'Run .\tools\prepare_ue.ps1 first.' }
-if (Get-NetUDPEndpoint -LocalPort 19858 -ErrorAction SilentlyContinue) { throw 'An Arrietty UE bridge is already running (UDP 19858).' }
+if ($Port -lt 1024 -or $Port -gt 65535) { throw 'Invalid loopback port.' }
+if (Get-NetUDPEndpoint -LocalPort $Port -ErrorAction SilentlyContinue) { throw "An Arrietty UE bridge is already running (UDP $Port)." }
 if (-not $Offline) {
     if (Get-Process blender -ErrorAction SilentlyContinue) { throw 'Close the UPBGE/Blender simulator before live UE use to avoid competing device ownership.' }
     if (-not (Get-Process vrserver -ErrorAction SilentlyContinue)) { throw 'Start SteamVR before launching live UE.' }
@@ -33,6 +48,7 @@ if ($version.MajorVersion -ne 5 -or $version.MinorVersion -ne 8) { throw 'UE 5.8
 $python=(& py -3.13 -c 'import sys; print(sys.executable)').Trim()
 if (-not (Test-Path (Join-Path $repo '.runtime\current.txt'))) { & $python (Join-Path $repo 'tools\install_runtime_dependencies.py') }
 $sessionArgs=@((Join-Path $repo 'tools\ue_session.py'),'--time',$LocalTime,'--world-root',$WorldRoot)
+if ($Port -ne 19858) { $sessionArgs+=@('--port',"$Port") }
 # Windows PowerShell 5.1 drops empty native-command arguments. Omit the
 # optional date so Python selects today's Tuvalu date with its own default.
 if ($LocalDate) { $sessionArgs+=@('--date',$LocalDate) }
@@ -57,7 +73,7 @@ try {
         $ready=Select-String -LiteralPath (Join-Path $repo 'logs\latest-ue-bridge.log') -Pattern 'ARRIETTY_UE_BRIDGE_READY' -Quiet
     } until ($ready -or [DateTime]::UtcNow -gt $deadline)
     if (-not $ready) { throw 'Bridge startup timed out.' }
-    $ueArgs=@(('"'+$project+'"'),'-game','-nosplash','-nop4',('-abslog="'+(Join-Path $repo 'logs\latest-ue.log')+'"'),'-windowed','-ResX=1600','-ResY=900')
+    $ueArgs=@(('"'+$project+'"'),'/Game/Maps/Funafuti','-game','-nosplash','-nop4',('-abslog="'+(Join-Path $repo 'logs\latest-ue.log')+'"'),'-windowed','-ResX=1600','-ResY=900')
     if ($Offline) { $ueArgs+='-nohmd' } else { $ueArgs+='-vr' }
     if ($SmokeTest) { $ueArgs+='-ArriettySmoke'; $ueArgs+='-unattended' }
     if ($Headless) { $ueArgs+='-RenderOffscreen'; $ueArgs+='-nosound' }

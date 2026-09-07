@@ -5,6 +5,7 @@
   "Description": "Arrietty bicycle and human-powered flight / Secret World",
   "Modules": [{"Name": "ArriettyUE", "Type": "Runtime", "LoadingPhase": "Default"}],
   "Plugins": [
+    {"Name": "Niagara", "Enabled": true},
     {"Name": "AndroidFileServer", "Enabled": false},
     {"Name": "OpenXR", "Enabled": true},
     {"Name": "ProceduralMeshComponent", "Enabled": true},

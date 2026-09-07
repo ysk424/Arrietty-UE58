@@ -13,19 +13,23 @@ TSharedRef<SWidget> UArriettySetup::RebuildWidget()
     return SNew(SBorder).Padding(24).BorderBackgroundColor(FLinearColor(.02f,.035f,.055f,.95f))
     [ SNew(SVerticalBox)
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,15)
-        [SNew(STextBlock).Text(FText::FromString(TEXT("ARRIETTY / FUNAFUTI"))).Font(FCoreStyle::GetDefaultFontStyle("Bold",22))]
+        [SNew(STextBlock).Text_Lambda([this]{return FText::FromString(TEXT("ARRIETTY / ")+(Pawn?Pawn->SetupWorldName:TEXT("")));}).Font(FCoreStyle::GetDefaultFontStyle("Bold",22))]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,8)
-        [SNew(STextBlock).Text(FText::FromString(TEXT("Tuvalu local date / time (UTC+12)"))).Font(Font)]
+        [SNew(STextBlock).Text(FText::FromString(TEXT("Tuvalu local date / time (UTC+12)"))).Font(Font)
+            .Visibility_Lambda([this]{return Pawn && Pawn->bAuthoredLighting?EVisibility::Collapsed:EVisibility::Visible;})]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,8)
         [SNew(SEditableTextBox).Text_Lambda([this]{return FText::FromString(Pawn?Pawn->SetupDate:TEXT(""));})
+            .Visibility_Lambda([this]{return Pawn && Pawn->bAuthoredLighting?EVisibility::Collapsed:EVisibility::Visible;})
             .HintText(FText::FromString(TEXT("YYYY-MM-DD"))).Font(Font)
             .OnTextChanged_Lambda([this](const FText& T){if(Pawn){Pawn->SetupDate=T.ToString();Pawn->bSetupDirty=true;}})]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,12)
         [SNew(SEditableTextBox).Text_Lambda([this]{return FText::FromString(Pawn?Pawn->SetupTime:TEXT(""));})
+            .Visibility_Lambda([this]{return Pawn && Pawn->bAuthoredLighting?EVisibility::Collapsed:EVisibility::Visible;})
             .HintText(FText::FromString(TEXT("HH:MM"))).Font(Font)
             .OnTextChanged_Lambda([this](const FText& T){if(Pawn){Pawn->SetupTime=T.ToString();Pawn->bSetupDirty=true;}})]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,12)
         [SNew(SButton).Text(FText::FromString(TEXT("Apply local date / time")))
+            .Visibility_Lambda([this]{return Pawn && Pawn->bAuthoredLighting?EVisibility::Collapsed:EVisibility::Visible;})
             .OnClicked_Lambda([this]{if(Pawn){++Pawn->ApplyId;Pawn->bSetupDirty=true;}return FReply::Handled();})]
         +SVerticalBox::Slot().AutoHeight().Padding(0,0,0,12)
         [SNew(STextBlock).AutoWrapText(true).Font(Font)
@@ -36,6 +40,6 @@ TSharedRef<SWidget> UArriettySetup::RebuildWidget()
             .OnClicked_Lambda([this]{if(Pawn)Pawn->StartSimulation();return FReply::Handled();})]
         +SVerticalBox::Slot().AutoHeight()
         [SNew(STextBlock).AutoWrapText(true).Font(FCoreStyle::GetDefaultFontStyle("Regular",12))
-            .Text(FText::FromString(TEXT("Button 1: align and start\nEsc: return here to change the date/time\nClose the window to exit")))]
+            .Text(FText::FromString(TEXT("Button 1: align and start\nEsc: return to setup\nClose the window to exit")))]
     ];
 }

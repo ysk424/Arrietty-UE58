@@ -16,7 +16,10 @@ def main():
     p.add_argument('--time', default='17:45')
     p.add_argument('--world-root', type=Path, default=ROOT.parent/'Secret-World')
     p.add_argument('--hardware', action='store_true')
+    p.add_argument('--port', type=int, default=19858)
     args = p.parse_args()
+    if not 1024 <= args.port <= 65535:
+        p.error('Invalid loopback port')
     directory = ROOT/'unreal/ArriettyUE/Content/SecretWorld'
     world = json.loads((directory/'world.json').read_text(encoding='utf-8'))
     for name, field in [('world.bin','geometry_sha256'),('reef.bgra','reef_sha256')]:
@@ -37,7 +40,7 @@ def main():
     runtime=ROOT/'.runtime/ue'
     runtime.mkdir(parents=True,exist_ok=True)
     (runtime/'world-session.json').write_text(json.dumps(world,ensure_ascii=False),encoding='utf-8')
-    config={'token':secrets.token_hex(32),'port':19858,'hardware':args.hardware}
+    config={'token':secrets.token_hex(32),'port':args.port,'hardware':args.hardware}
     (runtime/'session.json').write_text(json.dumps(config),encoding='utf-8')
     print(f"Secret World {world['build_number']} | Tuvalu {result['local']}")
 

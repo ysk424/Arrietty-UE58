@@ -12,5 +12,5 @@ try {
     & (Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor-Cmd.exe') (Join-Path $repo 'unreal\ArriettyUE\ArriettyUE.uproject') -unattended -nop4 -nosound -nohmd -NullRHI '-ExecCmds=Automation RunTests Arrietty.' '-TestExit=Automation Test Queue Empty' "-abslog=$log" *> (Join-Path $repo 'logs\ue-automation-console.log')
     if ($LASTEXITCODE -ne 0 -or -not (Select-String -LiteralPath $log -Pattern 'Result=\{Success\}.*Arrietty.Coordinates.Attitude' -Quiet)) { throw 'Native UE tests failed; see logs/ue-automation.log' }
     if (-not (Select-String -LiteralPath $log -Pattern 'Result=\{Success\}.*Arrietty.Coordinates.HmdAlignment' -Quiet)) { throw 'HMD camera alignment tests failed; see logs/ue-automation.log' }
-    if ($Smoke) { & .\start-ue.ps1 -Offline -SmokeTest -Headless -EngineRoot $EngineRoot }
+    if ($Smoke) { & .\start-ue.ps1 -Offline -SmokeTest -Headless -Port 29858 -EngineRoot $EngineRoot }
 } finally { Pop-Location }

@@ -97,6 +97,8 @@ class Simulation:
         if request > self.apply_id:
             self.apply_id = request
             try:
+                if self.world.get('solar_mode') == 'authored':
+                    raise ValueError('This world uses its exported lighting; date/time changes are unavailable.')
                 path = Path(self.world.get('solar_module_path') or ROOT.parent / 'Secret-World/solar.py')
                 spec = importlib.util.spec_from_file_location('arrietty_world_solar', path)
                 solar = importlib.util.module_from_spec(spec)
@@ -229,7 +231,10 @@ class Simulation:
         _update_navigation(s)
         s.flight_log.sample(s, now)
         s.frame_count += 1
-        return {"playing": True, "pose": ue_pose(s), "align_request": self.alignment_id if s.ride_active else 0,
+        pose = ue_pose(s)
+        for index, offset in enumerate(self.world.get('spawn_location_cm', (0, 0, 0))):
+            pose[index] += offset
+        return {"playing": True, "pose": pose, "align_request": self.alignment_id if s.ride_active else 0,
                 "recenter_id": self.recenter_id,
                 "alignment_applied": self.applied_alignment_id,
                 "ride": s.ride_active, "airborne": s.flight.airborne,

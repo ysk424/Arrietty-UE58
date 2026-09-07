@@ -16,6 +16,30 @@ WORLD=dict(initial_heading_degrees=0., output_name='fixture.blend', origin_latit
 
 
 class UEBridgeTests(unittest.TestCase):
+    def test_exported_world_spawn_and_restart_keep_relative_flight_model(self):
+        with tempfile.TemporaryDirectory() as directory:
+            world = dict(WORLD, spawn_location_cm=[1000, -2000, 500], solar_mode='authored')
+            simulation = Simulation(world, log_path=Path(directory)/'ride.csv')
+            try:
+                first = simulation.step(dict(play=True, hmd_valid=True, buttons=0), .01, 1)
+                self.assertEqual(first['pose'][:3], [1000, -2000, 500])
+                simulation.state.position_x_meters = 7
+                simulation.state.flight.altitude_meters = 2
+                shifted = simulation.step(dict(play=True, hmd_valid=True, buttons=0), .01, 2)
+                self.assertEqual(shifted['pose'][:3], [1000, -1300, 700])
+                simulation.stop()
+                restarted = simulation.step(dict(play=True, hmd_valid=True, buttons=0), .01, 3)
+                self.assertEqual(restarted['pose'][:3], [1000, -2000, 500])
+            finally:
+                simulation.stop()
+
+    def test_authored_lighting_never_loads_tuvalu_solar_module(self):
+        simulation = Simulation(dict(WORLD, solar_mode='authored'))
+        with patch('arrietty_ue.bridge.importlib.util.spec_from_file_location') as load:
+            result = simulation.setup(dict(apply_id=1))
+            self.assertIn('exported lighting', result['apply_error'])
+            load.assert_not_called()
+
     def test_loopback_watchdog_and_reordered_packets(self):
         with tempfile.TemporaryDirectory() as td, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client:
             root=Path(td)

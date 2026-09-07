@@ -5,5 +5,6 @@ public class ArriettyUE : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "InputCore", "HeadMountedDisplay", "XRBase", "Sockets", "Networking", "Json", "UMG", "Slate", "SlateCore", "ProceduralMeshComponent" });
+        PrivateDependencyModuleNames.AddRange(new[] { "PakFile", "Landscape", "Foliage", "LevelSequence", "MovieSceneTracks", "CinematicCamera", "Niagara" });
     }
 }

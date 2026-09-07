@@ -77,7 +77,23 @@ void AArriettyPawn::BeginPlay()
     TSharedPtr<FJsonObject> Solar;
     if(FFileHelper::LoadFileToString(SolarData,*FPlatformMisc::GetEnvironmentVariable(TEXT("ARRIETTY_UE_SOLAR"))) &&
        FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(SolarData),Solar))
-    { const FString Local=Solar->GetStringField(TEXT("local_time")); SetupDate=Local.Left(10); SetupTime=Local.Mid(11,5); }
+    {
+        const FString Local=Solar->GetStringField(TEXT("local_time")); SetupDate=Local.Left(10); SetupTime=Local.Mid(11,5);
+        FString Mode;
+        bAuthoredLighting=Solar->TryGetStringField(TEXT("solar_mode"),Mode) && Mode==TEXT("authored");
+        if(bAuthoredLighting)
+        {
+            SetupWorldName=Solar->GetStringField(TEXT("output_name"));
+            SetupMessage=TEXT("Lighting and atmosphere from the exported world.");
+            const auto& Start=Solar->GetArrayField(TEXT("spawn_location_cm"));
+            SetActorLocationAndRotation(FVector(Start[0]->AsNumber(),Start[1]->AsNumber(),Start[2]->AsNumber()),
+                FRotator(0,180-Solar->GetNumberField(TEXT("initial_heading_degrees")),0));
+            const FString ActualMap=GetWorld()->GetPackage()->GetName();
+            if(ActualMap!=Solar->GetStringField(TEXT("map")))
+            { UE_LOG(LogTemp,Error,TEXT("ARRIETTY_WORLD_WRONG_MAP")); FPlatformMisc::RequestExitWithStatus(true,1); return; }
+            UE_LOG(LogTemp,Display,TEXT("ARRIETTY_WORLD_MAP_READY %s"),*ActualMap);
+        }
+    }
     if(auto PC=Cast<APlayerController>(GetController()); PC && !bSmoke)
     {
         Setup=CreateWidget<UArriettySetup>(PC); Setup->Pawn=this;
@@ -196,7 +212,7 @@ void AArriettyPawn::Tick(float Delta)
                     if(AppliedId==ApplyId) bSetupDirty=false;
                     SetupMessage=TEXT("Applied: ")+P->GetStringField(TEXT("local_time"));
                     const double Azimuth=P->GetNumberField(TEXT("sun_azimuth")),Elevation=P->GetNumberField(TEXT("sun_elevation"));
-                    for(TActorIterator<ADirectionalLight> It(GetWorld());It;++It)
+                    for(TActorIterator<ADirectionalLight> It(GetWorld());!bAuthoredLighting && It;++It)
                     {
                         It->SetActorRotation(FRotator(-Elevation,Azimuth+180,0));
                         Cast<UDirectionalLightComponent>(It->GetLightComponent())->SetIntensity(50000*FMath::Clamp((Elevation+.3)/8.,0.,1.));

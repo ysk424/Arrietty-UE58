@@ -19,6 +19,8 @@ public:
     virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
     FString SetupDate, SetupTime, SetupMessage=TEXT("Local time stays fixed during play.");
+    FString SetupWorldName=TEXT("FUNAFUTI");
+    bool bAuthoredLighting=false;
     bool bSetupDirty=false;
     int32 ApplyId=0;
     void StartSimulation() { if(!bSetupDirty) bPlaying=true; }

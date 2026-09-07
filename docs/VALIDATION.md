@@ -1,6 +1,66 @@
 # Validation and operational baseline
 
-Date: 2026-09-07 (Asia/Tokyo).
+Updated: 2026-09-08 (Asia/Tokyo). The original operational baseline below is retained.
+
+## World separation in the isolated worktree — 2026-09-08
+
+Implementation: `Arrietty-UE58-worlds`, branch `work/world-export-20260908`,
+based on `ef86436`. See [today's changeable specification](WORLD_SPEC_2026-09-08.md)
+and [usage](WORLDS.md). The fitness checkout remains on `main`; its tracked
+files and mutable runtime state were not modified. No merge or push was made.
+
+User report: the user reported a good fitness session yesterday and requested
+a worktree because the current installation is in use. This is separate from
+the automated evidence below and is not a hardware acceptance of these changes.
+
+Automated/offline evidence:
+
+- Windows Development Editor and packaged Windows Development targets built
+  with UE 5.8.2 / changelist 56702186. The packaged game runs without UE Editor.
+  Package output: `build/runtime/Windows`; build log: `logs/runtime-package.log`.
+- All **103 Python tests pass** (`logs/world-final-python-tests.log`). This includes
+  saved-source changes/additions/deletions, output corruption, path containment,
+  compatibility, malformed manifests, external-world spawn/restart, authored
+  lighting, and real PowerShell 5.1/7 argument forwarding with paths containing spaces.
+- Native `Arrietty.Coordinates.Attitude` and `Arrietty.Coordinates.HmdAlignment`
+  both report `Result={Success}` (`logs/ue-automation.log`). The existing HMD
+  camera simulation tests remain intact; no live HMD measurement is implied.
+- Two disposable source projects, City and Island, were saved, exported through
+  the installed plugin, cooked and packed. The same packaged executable mounted
+  each external pak, loaded the requested map, received bridge telemetry, moved,
+  became airborne and exited normally. No runtime rebuild was needed between worlds.
+  Logs: `logs/world-fixture-City.full.log`, `logs/world-fixture-Island.full.log`;
+  session logs below include `ARRIETTY_WORLD_MAP_READY` and `ARRIETTY_UE_SMOKE_DONE`.
+- Both captured frames were visually inspected: custom source materials, sky,
+  lighting, a floor and tower, and readable flight instruments. Start coordinates
+  were [1000, 2000, 500] cm; displayed headings were 045 and 135 degrees.
+  Local screenshots are under `.runtime/world-sessions/` in
+  `dab3919fb5a54eff9fc53b83787ba0f7/user/Saved/Screenshots/ue-offline.png` (City)
+  and `562cd6943e1a4ad294270bc72816b9e1/user/Saved/Screenshots/ue-offline.png` (Island).
+- `tools/test_world_rejection.py` temporarily changed a fixture source map and
+  then a cooked pak, restoring each in `finally`. Both real launcher invocations
+  failed before creating a session (`source_changed=1 corrupt_output=1 sessions_started=0`).
+- The real UE menu registration API succeeds and an unsaved map is rejected
+  (`ARRIETTY_EDITOR_EXPORT_BOUNDARY_OK menu_api=1 unsaved_rejected=1`,
+  `logs/world-exporter-menu.log`). This commandlet check does not claim a visual
+  menu-click test in an interactive editor.
+- Legacy Tuvalu offline regression passed in the worktree on UDP 29858:
+  Runtime 20260905102318005, 428,029 triangles, 664 sections, and
+  `ARRIETTY_UE_SMOKE_DONE packets=6029 moved=1 airborne=1` in `logs/latest-ue.log`.
+  Generated content was copied into this worktree for this test; it does not
+  share mutable links with the fitness checkout. External-world tests use UDP 29859.
+
+No physical device services were started for these checks. HMD rendering,
+hardware controls and performance in exported worlds remain to be accepted
+on real equipment. Landscape, World Partition, Niagara and Sequencer have
+not received individual end-to-end acceptance tests. The existing flat-ground
+flight model is preserved; arbitrary-terrain landing is not implemented.
+The package is a Development build; its size is not an optimized shipping-size claim.
+
+All generated worlds, manifests containing local paths, packages, screenshots,
+session tokens and logs remain outside Git.
+`tools/check_public_tree.py` passed for 102 indexed public files, and
+`git diff --cached --check` reported no whitespace errors.
 
 ## Operational handoff
 
