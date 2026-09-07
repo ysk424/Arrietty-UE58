@@ -24,9 +24,21 @@ files live in ignored `.runtime/ue`, and tokens are not printed.
 The bridge waits without opening hardware until `play=true`. Button 1 creates
 an alignment request. UE rotates the tracking origin by inverse current HMD
 yaw and removes the initial horizontal room offset, retaining floor height.
+Alignment now runs in `CalcCamera`, where UE consumes the HMD pose. It is
+acknowledged only after `UCameraComponent::GetCameraView` produces a forward
+direction within one degree of the bicycle's local forward plane. This
+validates the final camera transform, including its parent, rather than
+accepting tracking-space pose validity as proof of visual alignment. Invalid
+or unavailable cameras leave the request pending and retry on the next view.
 The bridge allows movement only after the matching alignment ID, current HMD
 validity and VIVE tracking are present. The initial aircraft heading remains
 the Secret World runway heading. Subsequent Button 1 retains the 2m recovery.
+R requests fresh HMD/handle alignment with an increasing `recenter_id`, without
+changing the position, course direction or ride start time. Motion is suspended
+until the new alignment is acknowledged. Earlier replies cannot acknowledge a
+new R request. Head turning after alignment remains independent of steering.
+Final view, vehicle and raw HMD yaw are logged once per second for diagnosis;
+their difference during normal head turning is expected, not an error.
 
 Esc sends `play=false`; window close sends three quit datagrams. One second
 without an authenticated frame stops airflow/PTT, requests grade zero and
@@ -51,6 +63,12 @@ quaternion formula cannot detect. Vehicle attitude is level on the ground,
 while the PFD still shows commanded flight surface response before takeoff.
 Flight calculations preserve the accepted runway-relative zero-altitude
 model; this port does not introduce arbitrary elevated-terrain flight physics.
+`Arrietty.Coordinates.HmdAlignment` supplies simulated poses to UE's real
+`FDefaultXRCamera`, exercising the Pawn/Tracking/Camera hierarchy and final
+view for multiple room headings and the runway bearing. It checks forward
+translation, eye height, free head turning and rejection of a valid raw pose
+when the rendered camera is unavailable or still backwards. It opens no XR
+session or hardware service.
 
 ## Scenery and rendering
 

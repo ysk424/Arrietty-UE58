@@ -6,9 +6,11 @@ Date: 2026-09-07 (Asia/Tokyo).
 
 - UE 5.8.2, engine changelist 56702186, Win64 Development Editor target built
   successfully using the installed toolchain.
-- 80 Python tests pass: accepted model/protocol/control regressions plus UE
+- 82 Python tests pass: accepted model/protocol/control regressions plus UE
   coordinate mapping, alignment gating, complete flight/landing/restart,
   authenticated packet validation and an actual loopback watchdog test.
+  Added checks exercise ground movement across bearings and R realignment
+  without movement, a recovery jump, or a ride-clock reset before a fresh ack.
   The five original UPBGE-launcher-only tests are outside this UE repository.
 - Windows PowerShell 5.1 and PowerShell 7 both pass real native-argument
   launcher regressions with an omitted or explicit local date. An omitted
@@ -16,6 +18,11 @@ Date: 2026-09-07 (Asia/Tokyo).
   is required. A full offline launch/flight/exit also passed in PowerShell 5.1.
 - Native automation `Arrietty.Coordinates.Attitude` passes. Tests independently
   establish nose-up pitch and inside-wing-down bank in UE transforms.
+- `Arrietty.Coordinates.HmdAlignment` passes with the real UE camera path and
+  simulated HMD poses: 15 combinations of bicycle/room yaw, including reversed
+  and diagonal room headings. Final view direction, forward movement, eye
+  height, free head turning, invalid tracking and unavailable-camera gating
+  are checked. No live HMD pose is used by this test.
 - Latest Secret World Runtime: **20260905102318005**, SHA-256
   `e4bd10cdea5b936e5f73e6e30b8eef34424c55253571b8ef30b04eb56540be41`.
   1,409 source meshes, 428,029 triangles, 664 draw sections; exactly five
@@ -47,6 +54,14 @@ a packaged Windows distribution is not part of this source release.
 
 ## Evening hardware acceptance
 
+The user confirmed pedalling moves the scene, but reported apparent backward
+or diagonally backward movement. The recorded ground track agrees with its
+logged bicycle heading (apart from one recovery operation); the original log
+did not include rendered-camera yaw, so it cannot establish the HMD's facing
+direction or the root cause of that report. Alignment now waits for final
+camera confirmation, R can repeat it, and view/vehicle/raw-pose yaw is logged.
+The user's confirmation of the changed behavior in the HMD is still pending.
+
 1. Start SteamVR, close the UPBGE simulator, and run `./start-ue.ps1` from this
    repository. The user's ignored `settings.local.json` is already configured.
 2. In setup, select/apply the desired Tuvalu local date/time, then press P.
@@ -54,6 +69,9 @@ a packaged Windows distribution is not part of this source release.
 3. Face the physical bicycle direction with the handle centered and press
    Button 1. Confirm alignment, straight-ahead pedalling, elapsed time from
    zero, and correct left/right steering. HR may remain disconnected.
+   If facing is offset, stop pedalling, face along the bicycle with the handle
+   centered, and press R. Confirm the panel is ahead and the next pedal motion
+   moves forward; position and ride time should be preserved.
 4. Check Button 6 held/released grade, flight mode, pitch-up takeoff, both banks,
    landing, and the return-to-ground restriction while airborne. Check the
    approximately 2m Button 1 recovery at low speed.

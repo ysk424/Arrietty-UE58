@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 import tempfile
 import time
@@ -76,6 +77,44 @@ class UEBridgeTests(unittest.TestCase):
         s.flight.altitude_meters=2
         self.assertEqual(ue_pose(s)[2:4],[200,6])
         self.assertEqual(ue_pose(s)[5],-10)
+
+    def test_pedalling_matches_ue_forward_for_every_bearing(self):
+        for heading in [*range(-180,181,15), -43.075]:
+            with self.subTest(heading=heading):
+                s=RuntimeState(heading_degrees=heading,ride_active=True,speed_kmh=18)
+                s.advance_ground(.1)
+                pose=ue_pose(s)
+                yaw=math.radians(pose[4])
+                # UE's actual +X-forward basis is also checked by native tests.
+                self.assertAlmostEqual(pose[0],50*math.cos(yaw))
+                self.assertAlmostEqual(pose[1],50*math.sin(yaw))
+
+    def test_recenter_stops_motion_until_new_camera_ack_without_recovery(self):
+        with tempfile.TemporaryDirectory() as td:
+            sim=Simulation(WORLD,log_path=Path(td)/'flight.csv')
+            p=dict(play=True,buttons=0,aligned=0,hmd_valid=True,speed=27)
+            try:
+                sim.step(p,.02)
+                out=sim.step(dict(p,buttons=1),.02)
+                p['aligned']=out['align_request']
+                sim.step(p,.05)
+                position=ue_pose(sim.state)[:3]
+                started=sim.state.ride_started_at_seconds
+                p['recenter_id']=1
+                with patch.object(sim.state.steering,'recenter') as center:
+                    out=sim.step(p,.05)
+                    self.assertEqual(out['recenter_id'],1)
+                    self.assertNotEqual(out['align_request'],p['aligned'])
+                    self.assertEqual(ue_pose(sim.state)[:3],position)
+                    self.assertEqual(sim.state.ride_started_at_seconds,started)
+                    sim.step(p,.05)  # repeated UDP frames must not recenter again
+                    center.assert_called_once()
+                    self.assertEqual(ue_pose(sim.state)[:3],position)
+                p['aligned']=out['align_request']
+                sim.step(p,.05)
+                self.assertNotEqual(ue_pose(sim.state)[:3],position)
+            finally:
+                sim.stop()
 
     def test_untrusted_packets(self):
         p=dict(protocol=1,token='t',seq=1,play=True)

@@ -85,6 +85,7 @@ class Simulation:
                              ("latest-ue-flight.csv" if hardware else "latest-ue-offline.csv"))
         self.state = None
         self.alignment_id = 0
+        self.recenter_id = 0
         self.input_sequence = 0
         self.controller_status = "WAITING"
         self.apply_id = 0
@@ -158,6 +159,15 @@ class Simulation:
             return self.setup(packet)
         self.begin()
         s = self.state
+        request = int(packet.get("recenter_id", 0))
+        if request > self.recenter_id:
+            self.recenter_id = request
+            if s.ride_active:
+                # R repeats the facing/handle calibration without a recovery
+                # jump, resetting the course, or restarting the ride clock.
+                self.alignment_id += 1
+                s.hmd_aligned = False
+                s.steering.recenter()
         for event in s.serial.drain_events():
             if event.message:
                 self.controller_status = event.message
@@ -202,6 +212,7 @@ class Simulation:
         s.flight_log.sample(s, now)
         s.frame_count += 1
         return {"playing": True, "pose": ue_pose(s), "align_request": self.alignment_id,
+                "recenter_id": self.recenter_id,
                 "ride": s.ride_active, "airborne": s.flight.airborne,
                 "pitch": s.flight.pitch_degrees, "bank": s.flight.bank_degrees,
                 "heading": s.navigation_heading_degrees,
@@ -221,7 +232,7 @@ def valid_packet(raw, token):
             return None
         if type(p.get("seq")) is not int or type(p.get("play")) is not bool:
             return None
-        for key in ("speed", "power", "steer", "buttons", "aligned", "apply_id"):
+        for key in ("speed", "power", "steer", "buttons", "aligned", "apply_id", "recenter_id"):
             if key in p and (type(p[key]) not in (int, float) or not math.isfinite(p[key])):
                 return None
         return p

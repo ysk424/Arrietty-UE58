@@ -30,7 +30,7 @@ AArriettyPawn::AArriettyPawn()
     Origin=CreateDefaultSubobject<USceneComponent>(TEXT("Vehicle")); SetRootComponent(Origin);
     Tracking=CreateDefaultSubobject<USceneComponent>(TEXT("XROrigin")); Tracking->SetupAttachment(Origin);
     Camera=CreateDefaultSubobject<UCameraComponent>(TEXT("HMD")); Camera->SetupAttachment(Tracking);
-    Camera->bLockToHmd=true; Camera->SetFieldOfView(95);
+    Camera->bLockToHmd=true; Camera->bUsePawnControlRotation=false; Camera->SetFieldOfView(95);
     PanelComponent=CreateDefaultSubobject<UWidgetComponent>(TEXT("Instruments"));
     PanelComponent->SetupAttachment(Origin);
     PanelComponent->SetWidgetSpace(EWidgetSpace::World);
@@ -93,6 +93,7 @@ void AArriettyPawn::Send(bool Quit)
     P->SetNumberField(TEXT("protocol"),1); P->SetStringField(TEXT("token"),Token);
     P->SetNumberField(TEXT("seq"),++Sequence); P->SetBoolField(TEXT("play"),bPlaying);
     P->SetBoolField(TEXT("quit"),Quit); P->SetNumberField(TEXT("aligned"),Aligned);
+    P->SetNumberField(TEXT("recenter_id"),RecenterId);
     const bool Tracked=bOffline || (GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsTracking(IXRTrackingSystem::HMDDeviceId));
     P->SetBoolField(TEXT("hmd_valid"),Tracked);
     P->SetNumberField(TEXT("apply_id"),ApplyId);
@@ -125,7 +126,11 @@ void AArriettyPawn::Tick(float Delta)
     if(PC)
     {
         if(PC->WasInputKeyJustPressed(EKeys::P)) StartSimulation();
-        if(PC->WasInputKeyJustPressed(EKeys::Escape)) { bPlaying=false; Aligned=0; }
+        if(PC->WasInputKeyJustPressed(EKeys::Escape)) { bPlaying=false; Aligned=0; PendingAlignment=0; }
+        if(bPlaying && PC->WasInputKeyJustPressed(EKeys::R))
+        {
+            ++RecenterId; Aligned=0; PendingAlignment=0;
+        }
         if(bOffline) OfflineSpeed=FMath::Clamp(OfflineSpeed+(PC->IsInputKeyDown(EKeys::Up)?8.f:0.f)*Delta-(PC->IsInputKeyDown(EKeys::Down)?8.f:0.f)*Delta,0.f,60.f);
     }
     const double Now=FPlatformTime::Seconds();
@@ -177,7 +182,7 @@ void AArriettyPawn::Tick(float Delta)
         if(!P->TryGetStringField(TEXT("token"),ResponseToken) || ResponseToken!=Token || !P->TryGetNumberField(TEXT("seq"),ResponseSeq) || ResponseSeq<=ReceivedSequence) continue;
         ReceivedSequence=ResponseSeq; LastPacket=Now;
         bool Playing=false; P->TryGetBoolField(TEXT("playing"),Playing);
-        if(Panel) { Panel->Telemetry=P; Panel->bPlaying=Playing; Panel->Status=bOffline?TEXT("OFFLINE | ESC: SETUP"):TEXT("LIVE | ESC: SETUP"); }
+        if(Panel) { Panel->Telemetry=P; Panel->bPlaying=Playing; Panel->Status=bOffline?TEXT("OFFLINE | R: ALIGN | ESC: SETUP"):TEXT("LIVE | R: ALIGN | ESC: SETUP"); }
         if(!Playing)
         {
             double Ack=0;
@@ -200,7 +205,7 @@ void AArriettyPawn::Tick(float Delta)
             }
         }
         const TArray<TSharedPtr<FJsonValue>>* Pose;
-        if(Playing && P->TryGetArrayField(TEXT("pose"),Pose) && Pose->Num()==6)
+        if(bPlaying && Playing && P->TryGetArrayField(TEXT("pose"),Pose) && Pose->Num()==6)
         {
             FVector Position((*Pose)[0]->AsNumber(),(*Pose)[1]->AsNumber(),(*Pose)[2]->AsNumber());
             bSmokeMoved|=Position.Size2D()>100;
@@ -208,26 +213,65 @@ void AArriettyPawn::Tick(float Delta)
             FRotator Rotation((*Pose)[3]->AsNumber(),(*Pose)[4]->AsNumber(),(*Pose)[5]->AsNumber());
             if(!Position.ContainsNaN() && !Rotation.ContainsNaN()) SetActorLocationAndRotation(Position,Rotation);
             const int32 Request=P->GetIntegerField(TEXT("align_request"));
-            if(Request>0 && Request!=Aligned)
+            double RecenterAck=0; P->TryGetNumberField(TEXT("recenter_id"),RecenterAck);
+            if(Request>0 && Request!=Aligned && int32(RecenterAck)==RecenterId)
             {
-                FQuat Orientation; FVector HMDPosition;
                 if(bOffline) Aligned=Request;
-                else if(GEngine->XRSystem.IsValid() && GEngine->XRSystem->GetCurrentPose(IXRTrackingSystem::HMDDeviceId,Orientation,HMDPosition) && GEngine->XRSystem->IsTracking(IXRTrackingSystem::HMDDeviceId))
-                {
-                    const FRotator Yaw(0,-Orientation.Rotator().Yaw,0);
-                    Tracking->SetRelativeRotation(Yaw);
-                    const FVector Offset=Yaw.RotateVector(HMDPosition);
-                    Tracking->SetRelativeLocation(FVector(-Offset.X,-Offset.Y,0));
-                    Aligned=Request;
-                    UE_LOG(LogTemp,Display,TEXT("ARRIETTY_UE_HMD_ALIGNED id=%d"),Aligned);
-                }
+                else PendingAlignment=Request;
+                if(Panel && !bOffline) Panel->Status=TEXT("ALIGNING | FACE BICYCLE FORWARD");
             }
         }
     }
     if(LastPacket>0 && Now-LastPacket>1)
     {
-        bPlaying=false; Aligned=0;
+        bPlaying=false; Aligned=0; PendingAlignment=0;
         if(Panel) { Panel->Status=TEXT("CONNECTION LOST | P: RESTART"); Panel->bPlaying=false; }
+    }
+}
+
+void AArriettyPawn::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+    // Recenter where UE actually consumes the live pose, then verify the final
+    // camera before acknowledging it to the simulation. A tracking-space pose
+    // alone is not evidence that the rendered view faces along the bicycle.
+    FQuat HmdOrientation=FQuat::Identity;
+    FVector HmdPosition=FVector::ZeroVector;
+    auto XR=GEngine?GEngine->XRSystem:nullptr;
+    const bool Tracked=!bOffline && XR.IsValid() && XR->GetXRCamera().IsValid() && XR->IsHeadTrackingAllowedForWorld(*GetWorld()) &&
+        XR->IsTracking(IXRTrackingSystem::HMDDeviceId) &&
+        XR->GetCurrentPose(IXRTrackingSystem::HMDDeviceId,HmdOrientation,HmdPosition) &&
+        !HmdOrientation.ContainsNaN() && HmdOrientation.SizeSquared()>UE_SMALL_NUMBER && !HmdPosition.ContainsNaN();
+    bool Applied=false;
+    double RawYaw=0;
+    if(Tracked)
+    {
+        HmdOrientation.Normalize();
+        const FVector Forward=HmdOrientation.GetForwardVector();
+        RawYaw=FMath::RadiansToDegrees(FMath::Atan2(Forward.Y,Forward.X));
+        if(bPlaying && PendingAlignment>0 && Forward.SizeSquared2D()>1.e-4)
+        {
+            const FRotator Yaw(0,-RawYaw,0);
+            Tracking->SetRelativeRotation(Yaw);
+            const FVector Offset=Yaw.RotateVector(HmdPosition);
+            Tracking->SetRelativeLocation(FVector(-Offset.X,-Offset.Y,0));
+            Applied=true;
+        }
+    }
+    Camera->GetCameraView(DeltaTime,OutResult);
+    const FVector LocalForward=GetActorQuat().UnrotateVector(OutResult.Rotation.Vector());
+    const double Residual=FMath::RadiansToDegrees(FMath::Atan2(LocalForward.Y,LocalForward.X));
+    if(Applied && FMath::Abs(Residual)<1.0)
+    {
+        Aligned=PendingAlignment; PendingAlignment=0;
+        UE_LOG(LogTemp,Display,TEXT("ARRIETTY_UE_HMD_ALIGNED id=%d raw_yaw=%.2f origin_yaw=%.2f bike_yaw=%.2f view_yaw=%.2f residual=%.3f"),
+            Aligned,RawYaw,Tracking->GetRelativeRotation().Yaw,GetActorRotation().Yaw,OutResult.Rotation.Yaw,Residual);
+    }
+    const double Now=FPlatformTime::Seconds();
+    if(bPlaying && Now-LastViewLog>=1)
+    {
+        LastViewLog=Now;
+        UE_LOG(LogTemp,Display,TEXT("ARRIETTY_UE_VIEW aligned=%d pending=%d tracked=%d bike_yaw=%.2f view_yaw=%.2f raw_yaw=%.2f origin_yaw=%.2f relative_yaw=%.2f north_cm=%.1f east_cm=%.1f"),
+            Aligned,PendingAlignment,Tracked,GetActorRotation().Yaw,OutResult.Rotation.Yaw,RawYaw,Tracking->GetRelativeRotation().Yaw,Residual,GetActorLocation().X,GetActorLocation().Y);
     }
 }
 

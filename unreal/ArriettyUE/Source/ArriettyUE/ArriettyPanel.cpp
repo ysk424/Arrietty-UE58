@@ -32,6 +32,7 @@ int32 UArriettyPanel::NativePaint(const FPaintArgs& Args, const FGeometry& G,
         Text(60,265,TEXT("Button 2  Ground / flight    Button 6  Brake"),22);
         Text(60,315,TEXT("Button 3 / 4  Roll    Both  Pitch up"),22);
         Text(60,365,TEXT("Button 5  PTT    Esc  Return to setup"),22);
+        Text(60,408,TEXT("R  Realign HMD + centered handle during a ride"),22);
         Text(60,450,TEXT("Secret World | OpenStreetMap contributors / ODbL | Allen Coral Atlas / CC BY 4.0"),14);
         return L+3;
     }
