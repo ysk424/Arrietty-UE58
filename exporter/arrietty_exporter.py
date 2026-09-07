@@ -32,8 +32,10 @@ def _mounts(project, engine):
 def _collect(project, engine, map_name, profile):
     registry = u.AssetRegistryHelpers.get_asset_registry()
     registry.search_all_assets(True)
+    # Cook removes Editor-only import metadata; it is not runtime code.
     options = u.AssetRegistryDependencyOptions(
         include_hard_package_references=True, include_soft_package_references=True,
+        include_game_package_references=True, include_editor_only_package_references=False,
         include_searchable_names=False, include_soft_management_references=False,
         include_hard_management_references=False)
     mounts = _mounts(project, engine)

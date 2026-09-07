@@ -26,9 +26,10 @@ def install(project, engine):
     entries = data.setdefault('Plugins', [])
     entry = next((p for p in entries if p['Name'] == 'ArriettyExporter'), None)
     if entry is None:
-        entries.append({'Name': 'ArriettyExporter', 'Enabled': True, 'TargetAllowList': ['Editor']})
+        entries.append({'Name': 'ArriettyExporter', 'Enabled': True, 'TargetAllowList': ['Editor'],
+                        'SupportedTargetPlatforms': ['Win64']})
     else:
-        entry.update(Enabled=True, TargetAllowList=['Editor'])
+        entry.update(Enabled=True, TargetAllowList=['Editor'], SupportedTargetPlatforms=['Win64'])
     backup = project.with_suffix('.uproject.before-arrietty')
     if not backup.exists():
         shutil.copy2(project, backup)

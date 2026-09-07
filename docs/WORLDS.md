@@ -124,6 +124,11 @@ $documentsRoot = [Environment]::GetFolderPath('MyDocuments')
 
 ## 開発用検証
 
+2026-09-08には、利用者指定の `Documents/Unreal Projects/Funafuti/Funafuti.uproject` を用意しました。
+現在の地形は編集できるStatic Meshとして保存済みです。制作プロジェクト内の
+`README-Arrietty.md` に、CinderLinkでの編集と、その後のExport・起動手順があります。
+この準備ではFunafutiのExportと実機テストは実行していません。
+
 ```powershell
 py -3.13 -m unittest discover -s tests
 .\tools\test_ue.ps1 -Smoke

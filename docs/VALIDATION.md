@@ -69,6 +69,44 @@ or missing folders, and installer-error propagation. Python was replaced with
 a recording function for these checks; no existing source project was installed
 or modified. No UE rebuild was needed for this launcher-only addition.
 
+## Editable Funafuti preparation — later on 2026-09-08
+
+At the user's request, created `Documents/Unreal Projects/Funafuti/Funafuti.uproject`
+as an independent authoring project. The user will improve the scenery with
+CinderLink, explicitly export, and then test in Arrietty. This preparation did
+not export Funafuti or start its simulator/device session.
+
+- Verified the current fitness terrain stream and converted it to 664 saved
+  native Static Mesh assets/actors, 428,029 triangles and 32 material instances,
+  preserving the reef texture, sunset and departure point. Generation log:
+  `logs/funafuti-authoring.log`. Geometry Script is a creation tool only;
+  the saved actors require no Arrietty native class or Geometry Script actor.
+- Independently reloaded the saved map and checked every mesh's triangle count,
+  material and world bounds against the original stream. All triangle counts
+  match; the largest bounds error is 0.125 cm (`logs/funafuti-reload.log`).
+  Exporter's runtime dependency collection succeeds with zero additional
+  content-plugin mounts. Source provenance is in the project's ArriettyBaseline.json.
+- CinderLink's installed Editor module loads successfully; Arrietty Exporter
+  is enabled in the source project. No CinderLink model request was sent.
+- Captured and inspected an actual Editor overview without PIE:
+  `logs/funafuti-editor-overview.png` and ground-level `logs/funafuti-editor-runway.png`.
+  The runway, coast, buildings and vegetation
+  are present in the original sunset lighting. Unreal's stock SM5 CustomDepthWorldUnits
+  debug-visualization shader reports a compile warning; the imported terrain/materials
+  are not the shader named in that diagnostic.
+- Saved an overview viewport for the initial editing session. The reef texture's
+  reimport source is local to `Funafuti/SourceArt/reef.tga`, verified through UE's
+  AssetImportData API (`ARRIETTY_SOURCE_ART_LOCAL_OK`). The complete Python suite
+  still passes all 103 tests (`logs/funafuti-python-tests.log`).
+- Found that imported texture metadata introduced an Editor-only Interchange
+  dependency. Changed the exporter to request Game dependencies and omit Editor-only
+  references using UE's Asset Registry flags. A City fixture now imports a texture;
+  the complete export/Cook/pak/packaged movement-and-flight regression passes
+  (`logs/world-imported-texture-regression.log`). Funafuti was not used for that export test.
+- No fitness checkout files, current sessions, device settings or original
+  Secret World data were changed. The prepared map is Static Mesh terrain,
+  not a Landscape conversion or a new terrain-following flight model.
+
 ## Operational handoff
 
 After the forward-direction revision, the user stated

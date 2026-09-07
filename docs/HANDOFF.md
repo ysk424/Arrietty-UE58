@@ -19,10 +19,35 @@
 新経路はworktreeで実装済み。[使い方](WORLDS.md) と [検証記録](VALIDATION.md) を参照する。
 JSON + Cook済みpakを外部から読み込み、起動ごとにセッションを分離する。
 同じWindows実行版で2世界の走行・離陸・終了、旧Tuvalu回帰、Python 103件とUEネイティブ2件が成功。
-プラグインを入れたのは試験プロジェクトだけ。既存の制作物への配置・実機確認・元checkoutへの適用は未実施。
+初回は試験プロジェクトで検証し、その後、利用者指定の独立した制作元Funafutiにも配置した。
+実機確認・元checkoutへの適用は未実施。
 利用者の追加依頼により `install-world-exporter.ps1 <プロジェクトフォルダー名>` を追加。
 制作元はユーザープロファイルの `Documents/Unreal Projects` 直下を前提とする。
 指定フォルダー内の唯一の `.uproject` を既存Pythonインストーラーへ渡す。
+
+## Funafutiの編集用プロジェクト（2026-09-08追加依頼）
+
+利用者は `Documents/Unreal Projects/Funafuti` を作り、現在の地形を編集可能にするよう依頼した。
+その後は利用者がCinderLinkで美観を改善し、保存・明示的Export・Arriettyでのテストを行う順序。
+FunafutiのExportと実機テストを先回りして実行しない。
+
+- 作成先: `C:/Users/azoo/Documents/Unreal Projects/Funafuti/Funafuti.uproject`。
+  開始マップは `/Game/Worlds/Funafuti/Maps/Funafuti`。
+- 元の実運用Content/SecretWorldを読み取り、ハッシュ確認後、664個の保存済みStatic Meshへ変換した。
+  428,029三角形、32マテリアルインスタンス、海のテクスチャ、元の夕景、PlayerStartを保持。
+  Landscapeではなく、元の描画区画・マテリアル単位のメッシュ。全建物が一棟ずつではない。
+- Engineに設置済みのCinderLinkとプロジェクト内のArrietty Exporterを有効化。
+  CinderLinkのモデル会話は開始していない。プロジェクト内のREADME-Arrietty.md / AGENTS.mdに
+  美観の編集・書き出し手順と原データクレジットを残した。
+- 再開・検証用: `tools/prepare_funafuti_authoring.py`（既存の制作先は上書き拒否）、
+  `tools/build_funafuti_authoring.py`、`tools/verify_funafuti_authoring.py`。
+  原データの一時コピーはworktreeの `build/funafuti-authoring-input`。生成UEアセットはGit対象外。
+  海の再インポート原本は制作プロジェクト内の `SourceArt/reef.tga` に保持。
+- 保存後の再読み込みで全メッシュ・三角形数・配置を検証。境界座標の最大誤差0.125cm。
+  地形ActorはUE標準クラスのみで、実行用プラグインの追加mount依存は0。
+- テクスチャのInterchange編集用参照を実行用依存と誤判定する問題を発見し、
+  ExporterがUEのGame参照だけを辿るよう修正。別のCity fixtureでインポート画像の
+  Cook・pak・同じArrietty実行版での走行を確認した。Funafuti自体は未Export。
 
 ## 運用開始時点
 

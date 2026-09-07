@@ -1,6 +1,7 @@
 """UE-only integration fixture. Run only in a disposable test project."""
 import os
 from pathlib import Path
+import struct
 import unreal as u
 
 project = Path(u.Paths.get_project_file_path()).resolve()
@@ -12,6 +13,22 @@ world = u.EditorLoadingAndSavingUtils.new_blank_map(False)
 start = actors.spawn_actor_from_class(u.PlayerStart, u.Vector(1000, 2000, 500))
 start.set_actor_rotation(u.Rotator(pitch=0, yaw=45 if name == 'City' else 135, roll=0), False)
 material_path = '/Game/Worlds/'+name+'/M_Fixture'
+texture_path = '/Game/Worlds/'+name+'/T_ImportedFixture'
+if not u.EditorAssetLibrary.does_asset_exist(texture_path):
+    # Imported textures carry Editor-only Interchange metadata. That metadata
+    # must not become an unsupported runtime-code dependency during export.
+    source_texture = project.parent/'Saved/fixture-white.tga'
+    source_texture.parent.mkdir(parents=True, exist_ok=True)
+    source_texture.write_bytes(struct.pack('<BBBHHBHHHHBB', 0, 0, 2, 0, 0, 0, 0, 0, 2, 2, 32, 0x28)+bytes([255]*16))
+    task = u.AssetImportTask()
+    task.set_editor_property('filename', str(source_texture))
+    task.set_editor_property('destination_path', '/Game/Worlds/'+name)
+    task.set_editor_property('destination_name', 'T_ImportedFixture')
+    task.set_editor_property('automated', True)
+    task.set_editor_property('save', True)
+    u.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+texture = u.load_asset(texture_path)
+assert texture
 material = u.load_asset(material_path)
 if material is None:
     material = u.AssetToolsHelpers.get_asset_tools().create_asset('M_Fixture', '/Game/Worlds/'+name, u.Material, u.MaterialFactoryNew())
@@ -19,7 +36,12 @@ mel = u.MaterialEditingLibrary
 mel.delete_all_material_expressions(material)
 color = mel.create_material_expression(material, u.MaterialExpressionConstant3Vector, 0, 0)
 color.set_editor_property('constant', u.LinearColor(.12, .35, .6, 1) if name == 'City' else u.LinearColor(.1, .5, .16, 1))
-mel.connect_material_property(color, '', u.MaterialProperty.MP_BASE_COLOR)
+sample = mel.create_material_expression(material, u.MaterialExpressionTextureSample, 0, 200)
+sample.set_editor_property('texture', texture)
+multiply = mel.create_material_expression(material, u.MaterialExpressionMultiply, 250, 0)
+mel.connect_material_expressions(color, '', multiply, 'A')
+mel.connect_material_expressions(sample, 'RGB', multiply, 'B')
+mel.connect_material_property(multiply, '', u.MaterialProperty.MP_BASE_COLOR)
 mel.recompile_material(material)
 u.EditorAssetLibrary.save_loaded_asset(material)
 floor = actors.spawn_actor_from_class(u.StaticMeshActor, u.Vector(1000, 2000, 450))
