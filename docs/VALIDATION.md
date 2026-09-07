@@ -6,10 +6,14 @@ Date: 2026-09-07 (Asia/Tokyo).
 
 - UE 5.8.2, engine changelist 56702186, Win64 Development Editor target built
   successfully using the installed toolchain.
-- 78 Python tests pass: accepted model/protocol/control regressions plus UE
+- 80 Python tests pass: accepted model/protocol/control regressions plus UE
   coordinate mapping, alignment gating, complete flight/landing/restart,
   authenticated packet validation and an actual loopback watchdog test.
   The five original UPBGE-launcher-only tests are outside this UE repository.
+- Windows PowerShell 5.1 and PowerShell 7 both pass real native-argument
+  launcher regressions with an omitted or explicit local date. An omitted
+  date leaves Python's Tuvalu-date default in effect; no empty native argument
+  is required. A full offline launch/flight/exit also passed in PowerShell 5.1.
 - Native automation `Arrietty.Coordinates.Attitude` passes. Tests independently
   establish nose-up pitch and inside-wing-down bank in UE transforms.
 - Latest Secret World Runtime: **20260905102318005**, SHA-256

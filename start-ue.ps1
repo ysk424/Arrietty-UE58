@@ -32,7 +32,10 @@ $version=Get-Content (Join-Path $EngineRoot 'Engine\Build\Build.version') -Raw |
 if ($version.MajorVersion -ne 5 -or $version.MinorVersion -ne 8) { throw 'UE 5.8 is required.' }
 $python=(& py -3.13 -c 'import sys; print(sys.executable)').Trim()
 if (-not (Test-Path (Join-Path $repo '.runtime\current.txt'))) { & $python (Join-Path $repo 'tools\install_runtime_dependencies.py') }
-$sessionArgs=@((Join-Path $repo 'tools\ue_session.py'),'--date',$LocalDate,'--time',$LocalTime,'--world-root',$WorldRoot)
+$sessionArgs=@((Join-Path $repo 'tools\ue_session.py'),'--time',$LocalTime,'--world-root',$WorldRoot)
+# Windows PowerShell 5.1 drops empty native-command arguments. Omit the
+# optional date so Python selects today's Tuvalu date with its own default.
+if ($LocalDate) { $sessionArgs+=@('--date',$LocalDate) }
 if (-not $Offline) { $sessionArgs+='--hardware' }
 & $python @sessionArgs
 if ($LASTEXITCODE -ne 0) { throw 'UE session preparation failed.' }
