@@ -1,0 +1,102 @@
+"""UE Editor Python: reproducible materials and a small startup map."""
+from pathlib import Path
+import unreal as u
+
+assets = u.AssetToolsHelpers.get_asset_tools()
+mel = u.MaterialEditingLibrary
+
+task = u.AssetImportTask()
+task.set_editor_property('filename', str(Path(u.Paths.project_content_dir())/'SecretWorld/reef.tga'))
+task.set_editor_property('destination_path', '/Game/Materials')
+task.set_editor_property('destination_name', 'T_Reef')
+task.set_editor_property('automated', True)
+task.set_editor_property('replace_existing', True)
+task.set_editor_property('save', True)
+assets.import_asset_tasks([task])
+reef = u.load_asset('/Game/Materials/T_Reef')
+assert reef
+reef.set_editor_property('srgb',False)
+u.EditorAssetLibrary.save_loaded_asset(reef)
+
+
+def material(name, water=False):
+    path = '/Game/Materials/' + name
+    mat = u.load_asset(path)
+    if mat is None:
+        mat = assets.create_asset(name, '/Game/Materials', u.Material, u.MaterialFactoryNew())
+    mel.delete_all_material_expressions(mat)
+    mat.set_editor_property('two_sided', True)
+    color = mel.create_material_expression(mat, u.MaterialExpressionVectorParameter, -300, 0)
+    color.set_editor_property('parameter_name', 'Tint')
+    color.set_editor_property('default_value', u.LinearColor(.5,.5,.5,1))
+    if water:
+        color = mel.create_material_expression(mat, u.MaterialExpressionTextureSampleParameter2D, -300, 0)
+        color.set_editor_property('parameter_name', 'Reef')
+        color.set_editor_property('texture', reef)
+        color.set_editor_property('sampler_type', u.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    mel.connect_material_property(color, '', u.MaterialProperty.MP_BASE_COLOR)
+    rough = mel.create_material_expression(mat, u.MaterialExpressionScalarParameter, -300, 250)
+    rough.set_editor_property('parameter_name', 'Roughness')
+    rough.set_editor_property('default_value', .8)
+    mel.connect_material_property(rough, '', u.MaterialProperty.MP_ROUGHNESS)
+    mel.recompile_material(mat)
+    u.EditorAssetLibrary.save_loaded_asset(mat)
+
+
+material('M_World')
+material('M_Water', True)
+# Match the physical exposure of the scenery while keeping instrument luminance
+# readable in both the HMD and desktop mirror.
+if u.EditorAssetLibrary.does_asset_exist('/Game/Materials/M_Instruments'):
+    u.EditorAssetLibrary.delete_asset('/Game/Materials/M_Instruments')
+panel = u.EditorAssetLibrary.duplicate_asset('/Engine/EngineMaterials/Widget3DPassThrough','/Game/Materials/M_Instruments')
+panel.set_editor_property('blend_mode',u.BlendMode.BLEND_OPAQUE)
+panel.set_editor_property('two_sided',True)
+panel.set_editor_property('shading_model',u.MaterialShadingModel.MSM_UNLIT)
+source = mel.get_material_property_input_node(panel,u.MaterialProperty.MP_EMISSIVE_COLOR)
+output = mel.get_material_property_input_node_output_name(panel,u.MaterialProperty.MP_EMISSIVE_COLOR)
+inverse = mel.create_material_expression(panel,u.MaterialExpressionEyeAdaptationInverse,500,0)
+inputs=mel.get_material_expression_input_names(inverse)
+print('INVERSE_INPUTS',inputs)
+assert mel.connect_material_expressions(source,output,inverse,inputs[0])
+assert mel.connect_material_property(inverse,'',u.MaterialProperty.MP_EMISSIVE_COLOR)
+mel.recompile_material(panel)
+u.EditorAssetLibrary.save_loaded_asset(panel)
+levels = u.get_editor_subsystem(u.LevelEditorSubsystem)
+actors = u.get_editor_subsystem(u.EditorActorSubsystem)
+editor_world = u.EditorLoadingAndSavingUtils.new_blank_map(False)
+world_class = u.load_class(None, '/Script/ArriettyUE.ArriettyWorld')
+world = actors.spawn_actor_from_class(world_class, u.Vector(0,0,0))
+world.set_actor_label('Secret World - latest verified Runtime')
+sun = actors.spawn_actor_from_class(u.DirectionalLight, u.Vector(0,0,500))
+sun.set_actor_label('Funafuti Sun - fixed local time')
+sun.light_component.set_editor_property('mobility', u.ComponentMobility.MOVABLE)
+sun.light_component.set_editor_property('atmosphere_sun_light', True)
+sun.light_component.set_editor_property('intensity', 23000.)
+sun.set_actor_rotation(u.Rotator(-3.391,97.36,0),False)
+sky = actors.spawn_actor_from_class(u.SkyAtmosphere, u.Vector(0,0,0))
+sky.set_actor_label('Funafuti Atmosphere')
+light = actors.spawn_actor_from_class(u.SkyLight, u.Vector(0,0,200))
+light.light_component.set_editor_property('mobility', u.ComponentMobility.MOVABLE)
+light.light_component.set_editor_property('real_time_capture', True)
+light.light_component.set_editor_property('intensity', 1.)
+post = actors.spawn_actor_from_class(u.PostProcessVolume, u.Vector(0,0,0))
+post.set_editor_property('unbound', True)
+settings = post.get_editor_property('settings')
+settings.set_editor_property('override_auto_exposure_method', True)
+settings.set_editor_property('auto_exposure_method', u.AutoExposureMethod.AEM_MANUAL)
+settings.set_editor_property('override_auto_exposure_bias', True)
+settings.set_editor_property('auto_exposure_bias', 0.)
+settings.set_editor_property('override_auto_exposure_apply_physical_camera_exposure', True)
+settings.set_editor_property('auto_exposure_apply_physical_camera_exposure', True)
+settings.set_editor_property('override_camera_iso', True)
+settings.set_editor_property('camera_iso', 100.)
+settings.set_editor_property('override_camera_shutter_speed', True)
+settings.set_editor_property('camera_shutter_speed', 125.)
+settings.set_editor_property('override_depth_of_field_fstop', True)
+settings.set_editor_property('depth_of_field_fstop', 4.)
+post.set_editor_property('settings', settings)
+# Geometry is loaded from the verified stream at BeginPlay, avoiding huge uassets.
+assert u.EditorLoadingAndSavingUtils.save_map(editor_world,'/Game/Maps/Funafuti')
+u.EditorAssetLibrary.save_directory('/Game/Materials')
+print('ARRIETTY_UE_CONTENT_READY')

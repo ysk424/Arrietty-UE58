@@ -1,0 +1,11 @@
+* text=auto
+*.py text eol=lf
+*.ps1 text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.cs text eol=lf
+*.json text eol=lf
+*.ini text eol=lf
+*.md text eol=lf
+*.uproject text eol=lf
+*.whl binary
