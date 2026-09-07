@@ -1,6 +1,27 @@
-# Validation / next hardware session
+# Validation and operational baseline
 
 Date: 2026-09-07 (Asia/Tokyo).
+
+## Operational handoff
+
+After the forward-direction revision, the user stated
+「今晩から本気でつかえます」 (ready for serious use starting this evening)
+and requested documentation, persistent project notes and a push to the
+separate public repository. The implementation baseline for this handoff is
+[`b3b0cc1`](https://github.com/ysk424/Arrietty-UE58/commit/b3b0cc1).
+This records the user's decision to begin using the simulator; it is not a
+claim that every device and every item in the reference checklist was tested.
+
+The agreed operating sequence is **P, look straight ahead with the handle
+centered, then Button 1**. The initial HMD view defines forward once. The
+handle steers afterward; turning the head does not steer. R selects a new
+forward from the current view, while subsequent Button 1 is the 2m recovery.
+The heart-rate transmitter was not connected during this work and its live
+acceptance remains open. Its absence does not block riding.
+
+Project decisions and continuation notes are preserved in
+[HANDOFF.md](HANDOFF.md), with [AGENTS.md](../AGENTS.md) as the entry point for
+future coding sessions.
 
 ## Verified offline
 
@@ -41,7 +62,7 @@ Date: 2026-09-07 (Asia/Tokyo).
   readable three-part instrument panel, circular PFD and live values are
   present. The screenshot is local under
   `unreal/ArriettyUE/Saved/Screenshots/ue-offline.png`.
-- No hardware services were started during this work. The user's existing
+- Automated verification did not start hardware services. The user's existing
   UPBGE source, flight logs and Secret World source remain unchanged.
 
 Commands:
@@ -56,15 +77,14 @@ No live VR frame-rate or comfort claim has been established. The application
 currently launches through the installed UE Editor's standalone game mode;
 a packaged Windows distribution is not part of this source release.
 
-## Evening hardware acceptance
+## Direction reports and final behavior
 
 The user confirmed pedalling moves the scene, but reported apparent backward
 or diagonally backward movement. The recorded ground track agrees with its
 logged bicycle heading (apart from one recovery operation); the original log
 did not include rendered-camera yaw, so it cannot establish the HMD's facing
-direction or the root cause of that report. Alignment now waits for final
-camera confirmation, R can repeat it, and view/vehicle/raw-pose yaw is logged.
-The user's confirmation of the changed behavior in the HMD is still pending.
+direction or the root cause of that report. Revision `5bf08bd` added final
+camera confirmation, R realignment and view/vehicle/raw-pose yaw logging.
 
 The next live report described forward-right movement and clarified that
 Button 1 should latch the initial HMD-forward direction, with handle steering
@@ -72,7 +92,15 @@ afterward. The view log showed zero residual at alignment, followed by roughly
 10-20 degrees of view/course difference during initial riding. The revised
 calibration now preserves the pre-button view and sends its horizontal bearing
 to the simulation instead of rotating the camera to the preset runway course.
-Offline tests pass; confirmation of this revision in the HMD remains pending.
+This behavior is implemented in `b3b0cc1`; offline tests pass and the subsequent
+user decision to begin operation is recorded above. No fixed 15-, 45- or
+180-degree offset was introduced to compensate for one observed pose.
+
+## Reference checklist for ongoing use
+
+Use this checklist when validating changes or recording additional device
+results. The operational handoff does not imply a separate PASS for every
+item below.
 
 1. Start SteamVR, close the UPBGE simulator, and run `./start-ue.ps1` from this
    repository. The user's ignored `settings.local.json` is already configured.
@@ -96,5 +124,6 @@ Offline tests pass; confirmation of this revision in the HMD remains pending.
 7. When the heart-rate transmitter is available, verify discovery, live BPM,
    stale indication and reconnection separately.
 
-Pending outcomes should be recorded here after that session. Do not label
-hardware or HMD acceptance PASS based only on the offline results above.
+Record further device results here with the date and implementation revision.
+Keep user-reported operation, automated verification and individual hardware
+measurements distinct.
