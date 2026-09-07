@@ -62,6 +62,13 @@ session tokens and logs remain outside Git.
 `tools/check_public_tree.py` passed for 102 indexed public files, and
 `git diff --cached --check` reported no whitespace errors.
 
+Follow-up on the same date: `install-world-exporter.ps1 newWorld` resolves the
+project folder under the user's `Documents/Unreal Projects`. Manual checks in
+PowerShell 5.1 and 7 verified Python argument forwarding, rejection of invalid
+or missing folders, and installer-error propagation. Python was replaced with
+a recording function for these checks; no existing source project was installed
+or modified. No UE rebuild was needed for this launcher-only addition.
+
 ## Operational handoff
 
 After the forward-direction revision, the user stated

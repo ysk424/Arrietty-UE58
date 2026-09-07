@@ -73,6 +73,8 @@ UEの実行用形式、対応する表現、検証結果、実機で残る確認
   元データの追加・削除も不一致。元参照は読み取り・照合だけに使用する。
 - `exporter/` はEditorのToolsメニューから保存済みマップを書き出すPythonプラグイン。
   `tools/install_world_exporter.py <source.uproject>` で指定した制作元へ配置する。
+  同日の追加依頼で `install-world-exporter.ps1 <フォルダー名>` を追加した。
+  ユーザープロファイルの `Documents/Unreal Projects` 直下から制作元を見つける簡易入口。
   インストール先の `.uproject` は初回バックアップを作る。
   今回インストールしたのはworktree内の試験プロジェクトだけ。既存の制作物は未変更。
 - 必要な保存済み依存パッケージだけを出力側の `.work-<id>/ArriettyUE` に一時収集し、

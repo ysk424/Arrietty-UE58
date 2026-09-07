@@ -11,9 +11,9 @@
 Arriettyの通常起動は、検証と読み込みだけを行います。自動再エクスポートはしません。
 
 ```text
-Documents/Unreal Projects/newYork/   制作元（インポーターは読み取りだけ）
+Documents/Unreal Projects/newWorld/  制作元（インポーターは読み取りだけ）
                  ↓ 利用者が保存してExport
-Documents/Arrietty Projects/newYork/
+Documents/Arrietty Projects/newWorld/
     world.json                      固定名の入口・元参照・整合性情報
     world-<書き出しID>.pak           Windows用にCookした世界
                  ↓ 起動前の整合性検証
@@ -36,12 +36,17 @@ Unreal Projects直下に準備用プロジェクトや出力ディレクトリ�
 本体の機能を変更した場合は、このパッケージを更新します。
 世界だけの変更で本体を再ビルドする必要はありません。
 
-制作元のエディターを閉じてから、対象を明示してプラグインをインストールします。
+制作元のエディターを閉じてから、このworktreeでプロジェクトのフォルダー名を指定します。
 
 ```powershell
-$documentsRoot = [Environment]::GetFolderPath('MyDocuments')
-py -3.13 tools/install_world_exporter.py (Join-Path $documentsRoot 'Unreal Projects\newYork\newYork.uproject')
+.\install-world-exporter.ps1 newWorld
 ```
+
+この簡易インストーラーは `C:\Users\azoo\Documents\Unreal Projects\newWorld` 内の
+`.uproject` を見つけて、`tools/install_world_exporter.py` を呼び出します。
+引数はフォルダー名一つだけです。空白がある名前は `"New World"` のように引用符で囲みます。
+フォルダー内の `.uproject` が0個または複数ならエラーにし、インストールしません。
+通常はログインユーザーの `Documents\Unreal Projects` を参照します。
 
 インストーラーが変更するのは、指定した制作元の `Plugins/ArriettyExporter` と
 `.uproject` のプラグイン登録です。初回の `.uproject` は `.uproject.before-arrietty` として保存します。
@@ -70,7 +75,8 @@ UEのバッチ処理でCookし、UE標準の `.pak` にまとめ、成功後だ�
 ## 起動
 
 ```powershell
-.\start.ps1 -WorldManifest (Join-Path $documentsRoot 'Arrietty Projects\newYork\world.json')
+$documentsRoot = [Environment]::GetFolderPath('MyDocuments')
+.\start.ps1 -WorldManifest (Join-Path $documentsRoot 'Arrietty Projects\newWorld\world.json')
 ```
 
 実機ではSteamVRを先に起動し、他のArrietty/UPBGEを終了してください。
@@ -80,7 +86,7 @@ UEのバッチ処理でCookし、UE標準の `.pak` にまとめ、成功後だ�
 実機に接続しない確認:
 
 ```powershell
-.\start.ps1 -WorldManifest (Join-Path $documentsRoot 'Arrietty Projects\newYork\world.json') -Offline
+.\start.ps1 -WorldManifest (Join-Path $documentsRoot 'Arrietty Projects\newWorld\world.json') -Offline
 ```
 
 起動時に、本体の実行ファイルとpak、元の保存データ、変換済みデータ、対応するUE/描画設定を照合します。
