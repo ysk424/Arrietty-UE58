@@ -37,7 +37,9 @@ private:
     int32 Sequence=0, Aligned=0, PendingAlignment=0, RecenterId=0, ReceivedSequence=-1;
     float OfflineSpeed=0;
     double LastPacket=0, BeganAt=0, LastViewLog=0;
+    double AlignmentBearing=0;
     int32 AppliedId=-1;
     bool bInputWasPlaying=true;
     void Send(bool Quit=false);
+    bool CanApplyPose(int32 AppliedAlignment) const { return bOffline || Aligned==0 || AppliedAlignment==Aligned; }
 };

@@ -22,21 +22,28 @@ Malformed, reordered and other-client packets are discarded. Token/config
 files live in ignored `.runtime/ue`, and tokens are not printed.
 
 The bridge waits without opening hardware until `play=true`. Button 1 creates
-an alignment request. UE rotates the tracking origin by inverse current HMD
-yaw and removes the initial horizontal room offset, retaining floor height.
-Alignment now runs in `CalcCamera`, where UE consumes the HMD pose. It is
-acknowledged only after `UCameraComponent::GetCameraView` produces a forward
-direction within one degree of the bicycle's local forward plane. This
-validates the final camera transform, including its parent, rather than
-accepting tracking-space pose validity as proof of visual alignment. Invalid
-or unavailable cameras leave the request pending and retry on the next view.
-The bridge allows movement only after the matching alignment ID, current HMD
-validity and VIVE tracking are present. The initial aircraft heading remains
-the Secret World runway heading. Subsequent Button 1 retains the 2m recovery.
-R requests fresh HMD/handle alignment with an increasing `recenter_id`, without
-changing the position, course direction or ride start time. Motion is suspended
-until the new alignment is acknowledged. Earlier replies cannot acknowledge a
-new R request. Head turning after alignment remains independent of steering.
+an alignment request. In `CalcCamera`, UE reads the actual camera world-forward
+vector and projects it onto XY. This becomes the bicycle's forward bearing.
+The tracking-origin rotation is re-expressed under the new vehicle rotation
+so that the view direction stays unchanged, including head pitch and roll.
+Initial horizontal room offset is removed, retaining floor-relative eye height
+on the ground. The runway bearing is only the pre-start default; calibration
+selects the direction the rider is already looking, without rotating the view
+to match the runway.
+
+UE confirms the final camera's horizontal forward against the bicycle and
+sends `alignment_bearing` with the matching `aligned` ID. The Python bridge
+latches this bearing once before the first movement, recenters the handle,
+and replies with `alignment_applied`. While that reply is pending, UE ignores
+old poses so that buffered replies cannot restore the pre-calibration heading.
+Invalid poses, missing live bearings or unavailable cameras cannot enable
+movement. HMD validity and VIVE tracking are also required.
+
+Subsequent Button 1 retains the 2m recovery. R selects the current view as a
+new forward with an increasing `recenter_id`, preserving position and ride
+start time. Motion is suspended until the new alignment is acknowledged.
+Earlier replies cannot acknowledge a new R request. Head turning after
+alignment remains independent of steering; the handle controls the course.
 Final view, vehicle and raw HMD yaw are logged once per second for diagnosis;
 their difference during normal head turning is expected, not an error.
 
@@ -66,7 +73,9 @@ model; this port does not introduce arbitrary elevated-terrain flight physics.
 `Arrietty.Coordinates.HmdAlignment` supplies simulated poses to UE's real
 `FDefaultXRCamera`, exercising the Pawn/Tracking/Camera hierarchy and final
 view for multiple room headings and the runway bearing. It checks forward
-translation, eye height, free head turning and rejection of a valid raw pose
+translation along the pre-button view, preserved view orientation, eye height,
+free head turning, pitch/bank during recalibration, old-pose suppression,
+and rejection of a valid raw pose
 when the rendered camera is unavailable or still backwards. It opens no XR
 session or hardware service.
 

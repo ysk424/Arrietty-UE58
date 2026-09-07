@@ -6,11 +6,14 @@ Date: 2026-09-07 (Asia/Tokyo).
 
 - UE 5.8.2, engine changelist 56702186, Win64 Development Editor target built
   successfully using the installed toolchain.
-- 82 Python tests pass: accepted model/protocol/control regressions plus UE
+- 84 Python tests pass: accepted model/protocol/control regressions plus UE
   coordinate mapping, alignment gating, complete flight/landing/restart,
   authenticated packet validation and an actual loopback watchdog test.
   Added checks exercise ground movement across bearings and R realignment
   without movement, a recovery jump, or a ride-clock reset before a fresh ack.
+  HMD bearing is latched before first motion, including the measured diagonal
+  case; later gaze values and stale IDs cannot steer the bicycle. Live motion
+  requires a finite camera-confirmed bearing.
   The five original UPBGE-launcher-only tests are outside this UE repository.
 - Windows PowerShell 5.1 and PowerShell 7 both pass real native-argument
   launcher regressions with an omitted or explicit local date. An omitted
@@ -20,8 +23,9 @@ Date: 2026-09-07 (Asia/Tokyo).
   establish nose-up pitch and inside-wing-down bank in UE transforms.
 - `Arrietty.Coordinates.HmdAlignment` passes with the real UE camera path and
   simulated HMD poses: 15 combinations of bicycle/room yaw, including reversed
-  and diagonal room headings. Final view direction, forward movement, eye
-  height, free head turning, invalid tracking and unavailable-camera gating
+  and diagonal room headings. Pre-button view preservation, first movement
+  along that view, eye height, free head turning, recalibration with flight
+  pitch/bank, buffered old poses, invalid tracking and unavailable-camera gating
   are checked. No live HMD pose is used by this test.
 - Latest Secret World Runtime: **20260905102318005**, SHA-256
   `e4bd10cdea5b936e5f73e6e30b8eef34424c55253571b8ef30b04eb56540be41`.
@@ -61,6 +65,14 @@ did not include rendered-camera yaw, so it cannot establish the HMD's facing
 direction or the root cause of that report. Alignment now waits for final
 camera confirmation, R can repeat it, and view/vehicle/raw-pose yaw is logged.
 The user's confirmation of the changed behavior in the HMD is still pending.
+
+The next live report described forward-right movement and clarified that
+Button 1 should latch the initial HMD-forward direction, with handle steering
+afterward. The view log showed zero residual at alignment, followed by roughly
+10-20 degrees of view/course difference during initial riding. The revised
+calibration now preserves the pre-button view and sends its horizontal bearing
+to the simulation instead of rotating the camera to the preset runway course.
+Offline tests pass; confirmation of this revision in the HMD remains pending.
 
 1. Start SteamVR, close the UPBGE simulator, and run `./start-ue.ps1` from this
    repository. The user's ignored `settings.local.json` is already configured.

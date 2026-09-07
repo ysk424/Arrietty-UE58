@@ -64,12 +64,18 @@ bool FArriettyHmdAlignmentTest::RunTest(const FString&)
         for(double HeadYaw : {0.,45.,135.,180.,-137.})
         {
             Pawn->SetActorLocationAndRotation(FVector::ZeroVector,FRotator(0,BikeYaw,0));
+            Pawn->Tracking->SetRelativeTransform(FTransform::Identity);
             XR->Orientation=FRotator(-12,HeadYaw,5).Quaternion();
             Pawn->Camera->SetRelativeRotation(FRotator(0,180,0)); // stale camera
+            FMinimalViewInfo Before;
+            Pawn->Camera->GetCameraView(.01f,Before);
             Pawn->PendingAlignment=++Request;
             Pawn->CalcCamera(.01f,View);
             TestEqual(TEXT("Only a confirmed camera acknowledges alignment"),Pawn->Aligned,Request);
             const FVector RideForward=Pawn->GetActorForwardVector();
+            TestTrue(TEXT("Button 1 keeps the direction the rider was looking"),Before.Rotation.Quaternion().AngularDistance(View.Rotation.Quaternion())<1.e-5);
+            TestTrue(TEXT("HMD forward sets the course instead of the initial runway heading"),RideForward.Equals(Before.Rotation.Vector().GetSafeNormal2D(),1.e-5));
+            TestTrue(TEXT("Confirmed bearing is sent to the physics bridge"),FMath::Abs(FRotator::NormalizeAxis(Pawn->AlignmentBearing-Before.Rotation.Yaw))<1.e-5);
             TestTrue(TEXT("Final camera faces along the bicycle"),View.Rotation.Vector().GetSafeNormal2D().Equals(RideForward,1.e-5));
             TestTrue(TEXT("Room offset removed, floor-relative eye height retained"),View.Location.Equals(FVector(0,0,160),1.e-5));
             const FVector InitialEye=View.Location;
@@ -78,9 +84,21 @@ bool FArriettyHmdAlignmentTest::RunTest(const FString&)
             TestTrue(TEXT("Forward pedalling moves the actual view forward"),(View.Location-InitialEye).Equals(View.Rotation.Vector().GetSafeNormal2D()*300,1.e-5));
             XR->Orientation=FRotator(-12,HeadYaw+40,5).Quaternion();
             Pawn->CalcCamera(.01f,View);
-            TestTrue(TEXT("Looking sideways remains independent of steering"),FMath::Abs(FRotator::NormalizeAxis(View.Rotation.Yaw-BikeYaw)-40)<1.e-5);
+            TestTrue(TEXT("Looking sideways remains independent of steering"),FMath::Abs(FRotator::NormalizeAxis(View.Rotation.Yaw-Pawn->AlignmentBearing)-40)<1.e-5);
+            TestTrue(TEXT("Head turning does not change the latched bicycle forward"),Pawn->GetActorForwardVector().Equals(RideForward,1.e-5));
+            TestFalse(TEXT("A reply from before alignment cannot restore the runway heading"),Pawn->CanApplyPose(Request-1));
+            TestTrue(TEXT("The applied bearing allows subsequent simulation poses"),Pawn->CanApplyPose(Request));
         }
     }
+    Pawn->SetActorRotation(FRotator(6,223.075,-12));
+    XR->Orientation=FRotator(-12,-21.69,5).Quaternion();
+    FMinimalViewInfo BankedBefore;
+    Pawn->Camera->GetCameraView(.01f,BankedBefore);
+    Pawn->PendingAlignment=++Request;
+    Pawn->CalcCamera(.01f,View);
+    TestEqual(TEXT("Recalibration also works with flight pitch and bank"),Pawn->Aligned,Request);
+    TestTrue(TEXT("Flight recenter preserves the view orientation"),View.Rotation.Quaternion().AngularDistance(BankedBefore.Rotation.Quaternion())<1.e-5);
+    TestTrue(TEXT("Flight forward uses the view's horizontal projection"),Pawn->GetActorForwardVector().GetSafeNormal2D().Equals(View.Rotation.Vector().GetSafeNormal2D(),1.e-5));
     Pawn->Aligned=0; Pawn->PendingAlignment=++Request;
     XR->Valid=false;
     Pawn->CalcCamera(.01f,View);

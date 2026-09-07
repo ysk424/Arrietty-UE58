@@ -94,6 +94,7 @@ void AArriettyPawn::Send(bool Quit)
     P->SetNumberField(TEXT("seq"),++Sequence); P->SetBoolField(TEXT("play"),bPlaying);
     P->SetBoolField(TEXT("quit"),Quit); P->SetNumberField(TEXT("aligned"),Aligned);
     P->SetNumberField(TEXT("recenter_id"),RecenterId);
+    P->SetNumberField(TEXT("alignment_bearing"),AlignmentBearing);
     const bool Tracked=bOffline || (GEngine->XRSystem.IsValid() && GEngine->XRSystem->IsTracking(IXRTrackingSystem::HMDDeviceId));
     P->SetBoolField(TEXT("hmd_valid"),Tracked);
     P->SetNumberField(TEXT("apply_id"),ApplyId);
@@ -211,12 +212,16 @@ void AArriettyPawn::Tick(float Delta)
             bSmokeMoved|=Position.Size2D()>100;
             bool Airborne=false; P->TryGetBoolField(TEXT("airborne"),Airborne); bSmokeAirborne|=Airborne;
             FRotator Rotation((*Pose)[3]->AsNumber(),(*Pose)[4]->AsNumber(),(*Pose)[5]->AsNumber());
-            if(!Position.ContainsNaN() && !Rotation.ContainsNaN()) SetActorLocationAndRotation(Position,Rotation);
+            double AppliedAlignment=0; P->TryGetNumberField(TEXT("alignment_applied"),AppliedAlignment);
+            // An in-flight reply from before calibration must not rotate the
+            // camera back to the old runway heading while its ack is pending.
+            if(CanApplyPose(int32(AppliedAlignment)) && !Position.ContainsNaN() && !Rotation.ContainsNaN())
+                SetActorLocationAndRotation(Position,Rotation);
             const int32 Request=P->GetIntegerField(TEXT("align_request"));
             double RecenterAck=0; P->TryGetNumberField(TEXT("recenter_id"),RecenterAck);
             if(Request>0 && Request!=Aligned && int32(RecenterAck)==RecenterId)
             {
-                if(bOffline) Aligned=Request;
+                if(bOffline) { AlignmentBearing=Rotation.Yaw; Aligned=Request; }
                 else PendingAlignment=Request;
                 if(Panel && !bOffline) Panel->Status=TEXT("ALIGNING | FACE BICYCLE FORWARD");
             }
@@ -231,9 +236,8 @@ void AArriettyPawn::Tick(float Delta)
 
 void AArriettyPawn::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
 {
-    // Recenter where UE actually consumes the live pose, then verify the final
-    // camera before acknowledging it to the simulation. A tracking-space pose
-    // alone is not evidence that the rendered view faces along the bicycle.
+    // Capture the view the rider is already looking at. Its XY projection is
+    // the bicycle's new forward, not a correction back to the runway bearing.
     FQuat HmdOrientation=FQuat::Identity;
     FVector HmdPosition=FVector::ZeroVector;
     auto XR=GEngine?GEngine->XRSystem:nullptr;
@@ -243,23 +247,30 @@ void AArriettyPawn::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
         !HmdOrientation.ContainsNaN() && HmdOrientation.SizeSquared()>UE_SMALL_NUMBER && !HmdPosition.ContainsNaN();
     bool Applied=false;
     double RawYaw=0;
+    Camera->GetCameraView(DeltaTime,OutResult);
     if(Tracked)
     {
         HmdOrientation.Normalize();
         const FVector Forward=HmdOrientation.GetForwardVector();
         RawYaw=FMath::RadiansToDegrees(FMath::Atan2(Forward.Y,Forward.X));
-        if(bPlaying && PendingAlignment>0 && Forward.SizeSquared2D()>1.e-4)
+        const FVector ViewForward=OutResult.Rotation.Vector();
+        if(bPlaying && PendingAlignment>0 && ViewForward.SizeSquared2D()>1.e-4)
         {
-            const FRotator Yaw(0,-RawYaw,0);
-            Tracking->SetRelativeRotation(Yaw);
-            const FVector Offset=Yaw.RotateVector(HmdPosition);
+            AlignmentBearing=FMath::RadiansToDegrees(FMath::Atan2(ViewForward.Y,ViewForward.X));
+            const FQuat TrackingWorldRotation=Tracking->GetComponentQuat();
+            FRotator BikeRotation=GetActorRotation(); BikeRotation.Yaw=AlignmentBearing;
+            SetActorRotation(BikeRotation);
+            // Re-express the same tracking-to-world rotation under the new
+            // vehicle yaw. This preserves the view, including head pitch/roll.
+            const FQuat TrackingRotation=GetActorQuat().Inverse()*TrackingWorldRotation;
+            Tracking->SetRelativeRotation(TrackingRotation);
+            const FVector Offset=TrackingRotation.RotateVector(HmdPosition);
             Tracking->SetRelativeLocation(FVector(-Offset.X,-Offset.Y,0));
+            Camera->GetCameraView(DeltaTime,OutResult);
             Applied=true;
         }
     }
-    Camera->GetCameraView(DeltaTime,OutResult);
-    const FVector LocalForward=GetActorQuat().UnrotateVector(OutResult.Rotation.Vector());
-    const double Residual=FMath::RadiansToDegrees(FMath::Atan2(LocalForward.Y,LocalForward.X));
+    const double Residual=FRotator::NormalizeAxis(OutResult.Rotation.Yaw-GetActorRotation().Yaw);
     if(Applied && FMath::Abs(Residual)<1.0)
     {
         Aligned=PendingAlignment; PendingAlignment=0;

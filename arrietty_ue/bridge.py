@@ -85,6 +85,7 @@ class Simulation:
                              ("latest-ue-flight.csv" if hardware else "latest-ue-offline.csv"))
         self.state = None
         self.alignment_id = 0
+        self.applied_alignment_id = 0
         self.recenter_id = 0
         self.input_sequence = 0
         self.controller_status = "WAITING"
@@ -122,6 +123,7 @@ class Simulation:
                 setattr(s, name, OfflineDevice())
         s.heading_degrees = self.world["initial_heading_degrees"]
         self.state = s
+        self.applied_alignment_id = 0
         s.serial.start()
         s.steering.start()
         s.fan.start()
@@ -163,8 +165,8 @@ class Simulation:
         if request > self.recenter_id:
             self.recenter_id = request
             if s.ride_active:
-                # R repeats the facing/handle calibration without a recovery
-                # jump, resetting the course, or restarting the ride clock.
+                # R selects the current view as forward without a recovery
+                # jump or restarting the ride clock.
                 self.alignment_id += 1
                 s.hmd_aligned = False
                 s.steering.recenter()
@@ -191,12 +193,28 @@ class Simulation:
             s.heart_rate_status = "NOT CONNECTED"
         s.update_sensor_state(now)
         s.update_ride_elapsed(now)
+        aligned = (s.ride_active and self.alignment_id > 0 and
+                   packet.get("aligned") == self.alignment_id and
+                   bool(packet.get("hmd_valid", False)))
+        if aligned and self.applied_alignment_id != self.alignment_id:
+            bearing = packet.get("alignment_bearing")
+            # Older offline test clients retain their simulated course. Live
+            # movement requires the world-space bearing confirmed by the HMD.
+            if bearing is None and not self.hardware:
+                bearing = ue_pose(s)[4]
+            if type(bearing) not in (int, float) or not math.isfinite(bearing):
+                aligned = False
+            else:
+                s.heading_degrees = (180 - bearing + 180) % 360 - 180
+                if self.applied_alignment_id == 0:
+                    s.reset_recovery_trail()
+                self.applied_alignment_id = self.alignment_id
+                s.steering.recenter()
+                print(f"ARRIETTY_UE_FORWARD id={self.alignment_id} bearing={bearing % 360:.3f}", flush=True)
+        s.hmd_aligned = aligned
         s.update_steering_state()
         if not self.hardware:
             s.effective_steering_degrees = max(-35, min(35, float(packet.get("steer", 0))))
-        s.hmd_aligned = (s.ride_active and self.alignment_id > 0 and
-                         packet.get("aligned") == self.alignment_id and
-                         bool(packet.get("hmd_valid", False)))
         s.xr_bridge_status = "UE OPENXR" if self.hardware else "UE OFFLINE"
         s.flush_flight_button(now)
         result = s.voice.poll()
@@ -211,8 +229,9 @@ class Simulation:
         _update_navigation(s)
         s.flight_log.sample(s, now)
         s.frame_count += 1
-        return {"playing": True, "pose": ue_pose(s), "align_request": self.alignment_id,
+        return {"playing": True, "pose": ue_pose(s), "align_request": self.alignment_id if s.ride_active else 0,
                 "recenter_id": self.recenter_id,
+                "alignment_applied": self.applied_alignment_id,
                 "ride": s.ride_active, "airborne": s.flight.airborne,
                 "pitch": s.flight.pitch_degrees, "bank": s.flight.bank_degrees,
                 "heading": s.navigation_heading_degrees,
@@ -232,7 +251,7 @@ def valid_packet(raw, token):
             return None
         if type(p.get("seq")) is not int or type(p.get("play")) is not bool:
             return None
-        for key in ("speed", "power", "steer", "buttons", "aligned", "apply_id", "recenter_id"):
+        for key in ("speed", "power", "steer", "buttons", "aligned", "apply_id", "recenter_id", "alignment_bearing"):
             if key in p and (type(p[key]) not in (int, float) or not math.isfinite(p[key])):
                 return None
         return p

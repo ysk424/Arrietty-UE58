@@ -123,6 +123,57 @@ class UEBridgeTests(unittest.TestCase):
         self.assertIsNone(valid_packet(b'[]','t'))
         self.assertIsNone(valid_packet(json.dumps(dict(p,power=float('nan'))),'t'))
         self.assertIsNone(valid_packet(json.dumps(dict(p,seq=True)),'t'))
+        self.assertIsNone(valid_packet(json.dumps(dict(p,alignment_bearing=float('nan'))),'t'))
+        self.assertIsNone(valid_packet(json.dumps(dict(p,alignment_bearing=True)),'t'))
+
+    def test_hmd_bearing_is_latched_before_first_motion(self):
+        with tempfile.TemporaryDirectory() as td:
+            for bearing in (0,90,180,270,201.385):
+                with self.subTest(bearing=bearing):
+                    sim=Simulation(WORLD,log_path=Path(td)/'flight.csv')
+                    p=dict(play=True,buttons=0,aligned=0,hmd_valid=True,speed=18)
+                    try:
+                        sim.step(p,.02)
+                        out=sim.step(dict(p,buttons=1),.02)
+                        p.update(aligned=out['align_request'],alignment_bearing=bearing)
+                        out=sim.step(p,.05)
+                        self.assertEqual(out['alignment_applied'],p['aligned'])
+                        self.assertAlmostEqual(out['pose'][4],bearing)
+                        yaw=math.radians(bearing)
+                        self.assertAlmostEqual(out['pose'][0],25*math.cos(yaw))
+                        self.assertAlmostEqual(out['pose'][1],25*math.sin(yaw))
+                        self.assertAlmostEqual((180-sim.state.recovery_trail[0][3])%360,bearing)
+                        # Neither a new gaze value nor stale alignment frames
+                        # may keep steering the bicycle after Button 1.
+                        out=sim.step(dict(p,alignment_bearing=bearing+45),.05)
+                        self.assertAlmostEqual(out['pose'][4],bearing)
+                        position=out['pose'][:3]
+                        out=sim.step(dict(p,aligned=0,alignment_bearing=bearing+90),.05)
+                        self.assertEqual(out['pose'][:3],position)
+                        self.assertAlmostEqual(out['pose'][4],bearing)
+                    finally:
+                        sim.stop()
+
+    def test_live_alignment_requires_a_confirmed_bearing(self):
+        with tempfile.TemporaryDirectory() as td:
+            sim=Simulation(WORLD,log_path=Path(td)/'flight.csv')
+            p=dict(play=True,buttons=0,aligned=0,hmd_valid=True,speed=18)
+            try:
+                sim.step(p,.02)
+                out=sim.step(dict(p,buttons=1),.02)
+                # All device instances were installed offline; only exercise
+                # live protocol requirements, never open actual hardware.
+                sim.hardware=True
+                p['aligned']=out['align_request']
+                for value in (None,float('nan'),True):
+                    out=sim.step(dict(p,alignment_bearing=value),.05)
+                    self.assertEqual(sim.state.distance_meters,0)
+                    self.assertEqual(out['alignment_applied'],0)
+                out=sim.step(dict(p,alignment_bearing=201.385),.05)
+                self.assertAlmostEqual(out['pose'][4],201.385)
+                self.assertGreater(sim.state.distance_meters,0)
+            finally:
+                sim.stop()
 
     def test_offline_never_opens_hardware_and_waits_for_alignment(self):
         with tempfile.TemporaryDirectory() as td, patch('arrietty_up.bluetooth.BluetoothManager.start',side_effect=AssertionError('BLE')), patch('arrietty_up.serial_controller.SerialController.start',side_effect=AssertionError('Serial')), patch('arrietty_up.steering.SteeringController.start',side_effect=AssertionError('VR')), patch('arrietty_up.fan.FanController.start',side_effect=AssertionError('Fan')):
@@ -167,9 +218,11 @@ class UEBridgeTests(unittest.TestCase):
                     if not out['airborne']: break
                 self.assertFalse(out['airborne'])
                 sim.stop()
-                sim.step(p,.02)
+                out=sim.step(p,.02)
                 self.assertFalse(sim.state.ride_active)
                 self.assertEqual(sim.state.distance_meters,0)
+                self.assertEqual(out['align_request'],0)
+                self.assertEqual(out['alignment_applied'],0)
             finally:
                 sim.stop()
 
