@@ -7,7 +7,9 @@ Updated: 2026-09-08 (Asia/Tokyo). The original operational baseline below is ret
 Implementation: `Arrietty-UE58-worlds`, branch `work/world-export-20260908`,
 based on `ef86436`. See [today's changeable specification](WORLD_SPEC_2026-09-08.md)
 and [usage](WORLDS.md). The fitness checkout remains on `main`; its tracked
-files and mutable runtime state were not modified. No merge or push was made.
+files and mutable runtime state were not modified. No merge into the fitness
+main branch was made. A subsequent user request authorizes pushing the separate
+development branch to this repository's origin.
 
 User report: the user reported a good fitness session yesterday and requested
 a worktree because the current installation is in use. This is separate from

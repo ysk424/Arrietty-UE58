@@ -105,4 +105,5 @@ UEの実行用形式、対応する表現、検証結果、実機で残る確認
 - 本日の対象は世界受け渡しの基盤。新しい土地の作り込みやゲーム内の土地選択画面、
   任意地形に沿う走行・着陸、シームレスな世界移動は未実装。
   Landscape/World Partition/Niagara/Sequencerの個別対応、HMD・機器の実測は未確認。
-- 元checkoutへのマージ・適用・pushは行わない。元mainはcleanを維持する。
+- 元checkoutへのマージ・適用は行わない。元mainはcleanを維持する。
+  同日の後続push依頼に従い、開発ブランチだけをUE58リポジトリのoriginへpushする。
