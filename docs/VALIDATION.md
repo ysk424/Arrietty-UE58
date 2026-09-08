@@ -76,6 +76,11 @@ as an independent authoring project. The user will improve the scenery with
 CinderLink, explicitly export, and then test in Arrietty. This preparation did
 not export Funafuti or start its simulator/device session.
 
+Subsequent user report on the same date: the Export item was visible in Tools,
+README-Arrietty.md was read, and Codex was visible inside CinderLink. The user
+said the setup looked okay. This is direct user confirmation of the authoring
+UI; completion of art edits, a Funafuti export or hardware acceptance was not reported.
+
 - Verified the current fitness terrain stream and converted it to 664 saved
   native Static Mesh assets/actors, 428,029 triangles and 32 material instances,
   preserving the reef texture, sunset and departure point. Generation log:

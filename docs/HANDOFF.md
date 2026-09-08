@@ -49,6 +49,11 @@ FunafutiのExportと実機テストを先回りして実行しない。
   ExporterがUEのGame参照だけを辿るよう修正。別のCity fixtureでインポート画像の
   Cook・pak・同じArrietty実行版での走行を確認した。Funafuti自体は未Export。
 
+同日、利用者から「Toolsにexportがあった」「README-Arrietty.mdを読んだ」
+「CinderLink内にCodexが表示された」「大丈夫そう」との確認を受領した。
+これは利用者による制作環境の表示確認。美観編集・FunafutiのExport・実機試験の完了報告とは区別する。
+次回はこの制作プロジェクトで美観の編集から再開できる。
+
 ## 運用開始時点
 
 利用者から「今晩から本気でつかえます」との運用開始判断を受領し、
